@@ -1,0 +1,40 @@
+/* stylelint-disable */
+@tailwind base;
+@tailwind components;
+@layer components {
+  @import './styles/animations.css';
+}
+@tailwind utilities;
+
+:root {
+  --primary-dark: #1a1f35;
+  --primary-light: #2d3250;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+}
+
+body {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+      background: var(--primary-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-blue);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+}
