@@ -3,31 +3,33 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
   id             String           @id @default(cuid())
-  email          String           @unique
+  email          String          @unique
   name           String?
   preferences    UserPreferences?
   watchlist      Watchlist[]
   portfolioItems PortfolioItem[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  priceAlerts    PriceAlert[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 model UserPreferences {
-  id                    String  @id @default(cuid())
-  userId               String  @unique
-  user                 User    @relation(fields: [userId], references: [id])
-  riskTolerance        String  @default("MODERATE") // LOW, MODERATE, HIGH
-  preferredCurrencies  String[] // Array of currency codes
-  notificationsEnabled Boolean @default(true)
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id])
+  riskTolerance        String   @default("MODERATE")
+  preferredCurrencies  String    // Comma-separated list of currency codes
+  notificationsEnabled Boolean  @default(true)
 }
 
 model Watchlist {
@@ -54,19 +56,15 @@ model PortfolioItem {
 
 model PriceAlert {
   id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   symbol    String
   price     Float
-  condition String   // ABOVE, BELOW
+  condition String
+  triggered Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
 
-model MarketAnalysis {
-  id          String   @id @default(cuid())
-  symbol      String
-  trend       String   // BULLISH, BEARISH, NEUTRAL
-  confidence  Float    // 0-1
-  analysis    String   // Detailed analysis text
-  createdAt   DateTime @default(now())
-  validUntil  DateTime
+  @@index([symbol])
+  @@index([userId])
 }

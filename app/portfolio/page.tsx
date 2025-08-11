@@ -1,29 +1,14 @@
 'use client';
 
-import { Card, Title, BarChart, Subtitle, Button, Badge, TabGroup, TabList, Tab, TabPanels, TabPanel } from '@tremor/react';
+import { Title, Subtitle, Button, TabGroup, TabList, Tab, TabPanels, TabPanel } from '@tremor/react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 import Notification from '../components/Notification';
-
-interface PortfolioItem {
-  id: string;
-  symbol: string;
-  amount: number;
-  buyPrice: number;
-  currentPrice?: number;
-  profitLoss?: number;
-  profitLossPercentage?: number;
-}
-
-interface TradingSuggestion {
-  symbol: string;
-  action: 'BUY' | 'SELL' | 'HOLD';
-  confidence: number;
-  reason: string;
-  target_price?: number;
-  stop_loss?: number;
-  dayChange?: number;
-}
+import PortfolioOverview from '../components/portfolio/PortfolioOverview';
+import PortfolioHoldings from '../components/portfolio/PortfolioHoldings';
+import PortfolioAnalysis from '../components/portfolio/PortfolioAnalysis';
+import type { PortfolioItem, TradingSuggestion } from '../types/portfolio';
 
 export default function PortfolioPage() {
   // Type guard for AxiosError
@@ -34,7 +19,8 @@ export default function PortfolioPage() {
       typeof (error as { response?: unknown }).response === 'object'
     );
   }
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([
+
+  const [portfolio, setPortfolio] = useLocalStorage<PortfolioItem[]>('portfolio', [
     { id: '1', symbol: 'BTC', amount: 0.5, buyPrice: 45000 },
     { id: '2', symbol: 'ETH', amount: 5, buyPrice: 3000 },
   ]);
@@ -79,18 +65,7 @@ export default function PortfolioPage() {
     };
   }, [portfolio]);
 
-  const totalValue = portfolio.reduce((acc, item) => {
-    return acc + (item.currentPrice || 0) * item.amount;
-  }, 0);
-
-  const totalProfitLoss = portfolio.reduce((acc, item) => {
-    return acc + (item.profitLoss || 0);
-  }, 0);
-
-  const chartData = portfolio.map((item) => ({
-    name: item.symbol,
-    'Current Value': (item.currentPrice || 0) * item.amount,
-  }));
+{/* Moved calculations to render section */}
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
   const [tradingSuggestions, setTradingSuggestions] = useState<Record<string, TradingSuggestion>>({});
@@ -177,6 +152,14 @@ export default function PortfolioPage() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  const totalValue = portfolio.reduce((acc: number, item: PortfolioItem) => {
+    return acc + (item.currentPrice || 0) * item.amount;
+  }, 0);
+
+  const totalProfitLoss = portfolio.reduce((acc: number, item: PortfolioItem) => {
+    return acc + (item.profitLoss || 0);
+  }, 0);
+
   return (
     <main className={`p-4 md:p-10 mx-auto max-w-7xl slide-up ${isDark ? 'bg-primary-dark text-white' : 'bg-gray-50 text-primary-dark'}`}> 
       {notification && (
@@ -218,169 +201,31 @@ export default function PortfolioPage() {
 
         <TabPanels>
           <TabPanel>
-            <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {error ? (
-                <Card className="crypto-card glass-effect text-center">
-                  <Title className="text-yellow-700">Crypto Data Unavailable</Title>
-                  <Subtitle className="text-yellow-500">Due to rate limits, live data is temporarily unavailable. Please try again later.</Subtitle>
-                  <div className="mt-4 text-yellow-800">Your portfolio and suggestions will update automatically when data is available.</div>
-                </Card>
-              ) : (
-                <Card className="crypto-card glass-effect">
-                  {isLoading ? (
-                    <div className="animate-pulse space-y-4">
-                      <div className="h-6 w-1/2 bg-gray-700 rounded"></div>
-                      <div className="h-10 w-3/4 bg-gray-700 rounded"></div>
-                    </div>
-                  ) : (
-                    <>
-                      <Title className="text-gray-300">Total Portfolio Value</Title>
-                      <div className="mt-4">
-                        <span className="text-3xl font-bold gradient-text">${totalValue.toLocaleString()}</span>
-                        <span className={`ml-2 text-sm ${
-                          totalProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'
-                        } pulsing-element`}>
-                          {totalProfitLoss >= 0 ? '+' : ''}{totalProfitLoss.toLocaleString()} USD
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </Card>
-              )}
+            <PortfolioOverview 
+              portfolio={portfolio}
+              tradingSuggestions={tradingSuggestions}
+              totalValue={totalValue}
+              totalProfitLoss={totalProfitLoss}
+              isLoading={isLoading}
+              error={error}
+            />
+          </TabPanel>
 
-              <Card>
-                <Title>24h Change</Title>
-                <div className="mt-4">
-                  <span className="text-2xl font-bold">
-                    {(portfolio.reduce((acc, item) => {
-                      const suggestion = tradingSuggestions[item.symbol];
-                      return acc + (suggestion?.dayChange || 0);
-                    }, 0) / portfolio.length).toFixed(2)}%
-                  </span>
-                </div>
-              </Card>
-
-              <Card>
-                <Title>Risk Level</Title>
-                <div className="mt-4">
-                  <Badge color="yellow">Moderate</Badge>
-                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">Based on portfolio diversity and market volatility</p>
-                </div>
-              </Card>
-            </div>
-
+          <TabPanel>
             <div className="mt-6">
-              <Card>
-                <Title>Portfolio Distribution</Title>
-                <BarChart 
-                  className="mt-4 h-72"
-                  data={chartData}
-                  index="name"
-                  categories={['Current Value']}
-                  colors={['blue']}
-                  valueFormatter={(value) => `$${value.toLocaleString()}`}
-                />
-              </Card>
+              <PortfolioHoldings 
+                portfolio={portfolio}
+                tradingSuggestions={tradingSuggestions}
+              />
             </div>
           </TabPanel>
 
           <TabPanel>
             <div className="mt-6">
-              <Card className="crypto-card glass-effect">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-700">
-                    <thead>
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50">Asset</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50">Amount</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50">Buy Price</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50">Current Price</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50">Profit/Loss</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50">Suggestion</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-primary-dark divide-y divide-gray-200">
-                      {portfolio.map((item) => (
-                        <tr key={item.id} className="dark:bg-primary-dark">
-                          <td className="px-6 py-4 whitespace-nowrap text-primary-dark dark:text-white">{item.symbol}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-primary-dark dark:text-white">{item.amount}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-primary-dark dark:text-white">${item.buyPrice.toLocaleString()}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-primary-dark dark:text-white">${(item.currentPrice || 0).toLocaleString()}</td>
-                          <td className={`px-6 py-4 whitespace-nowrap ${(item.profitLoss || 0) >= 0 ? 'text-green-500' : 'text-red-500'} dark:text-green-400 dark:text-red-400`}>
-                            <span className={
-                              (item.profitLoss || 0) >= 0
-                                ? 'text-green-500 dark:text-green-400'
-                                : 'text-red-500 dark:text-red-400'
-                            }>
-                              {(item.profitLoss || 0) >= 0 ? '+' : ''}{(item.profitLoss || 0).toLocaleString()} USD
-                              <span className="ml-1 text-sm">
-                                ({(item.profitLossPercentage || 0).toFixed(2)}%)
-                              </span>
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge
-                              color={
-                                tradingSuggestions[item.symbol]?.action === 'BUY' ? 'green' :
-                                tradingSuggestions[item.symbol]?.action === 'SELL' ? 'red' :
-                                'yellow'
-                              }
-                            >
-                              {tradingSuggestions[item.symbol]?.action || 'ANALYZING'}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </div>
-          </TabPanel>
-
-          <TabPanel>
-            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {portfolio.map((item) => {
-                const suggestion = tradingSuggestions[item.symbol];
-                return (
-                  <Card key={item.id}>
-                    <Title>{item.symbol} Analysis</Title>
-                    <div className="mt-4">
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm text-gray-500">Recommendation</p>
-                          <div className="flex items-center space-x-2">
-                            <Badge
-                              color={
-                                suggestion?.action === 'BUY' ? 'green' :
-                                suggestion?.action === 'SELL' ? 'red' :
-                                'yellow'
-                              }
-                            >
-                              {suggestion?.action || 'ANALYZING'}
-                            </Badge>
-                            <span className="text-sm">
-                              Confidence: {((suggestion?.confidence || 0) * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Target Price</p>
-                          <p className="font-medium">${suggestion?.target_price?.toLocaleString() || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Stop Loss</p>
-                          <p className="font-medium">${suggestion?.stop_loss?.toLocaleString() || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Analysis</p>
-                          <p className="text-sm mt-1">{suggestion?.reason || 'Analyzing market conditions...'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+              <PortfolioAnalysis 
+                portfolio={portfolio}
+                tradingSuggestions={tradingSuggestions}
+              />
             </div>
           </TabPanel>
         </TabPanels>

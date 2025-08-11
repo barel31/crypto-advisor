@@ -1,26 +1,41 @@
 import { NextResponse } from 'next/server';
-import axios from 'axios';
-import type { AxiosError } from 'axios';
-// Simple in-memory cache for price data
-type PriceData = Record<string, {
-  usd: number;
-  usd_24h_change?: number;
-  usd_market_cap?: number;
-}>;
-const priceCache: Record<string, { data: PriceData; timestamp: number }> = {};
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+import axios, { AxiosError } from 'axios';
+import { 
+  COINGECKO_ENDPOINTS,
+  checkRateLimit,
+  getCacheKey,
+  getHeaders,
+  RateLimitError,
+  redis
+} from '@/lib/api-utils';
+import type { 
+  CoinGeckoMarket,
+  PriceData,
+  APIError 
+} from '@/types/api';
 
-// You'll need to sign up for a free API key at CoinGecko or similar service
-const COINGECKO_API = 'https://api.coingecko.com/api/v3';
+const CACHE_TTL = 10 * 60; // 10 minutes in seconds
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get('symbol');
+  const ip = request.headers.get('x-forwarded-for') || 'unknown';
 
   try {
+    // Check rate limit first
+    const rateLimit = await checkRateLimit(ip);
+    const headers = getHeaders(rateLimit);
+
     if (!symbol) {
       // Get top 100 cryptocurrencies
-      const response = await axios.get(`${COINGECKO_API}/coins/markets`, {
+      const cacheKey = getCacheKey('markets', 'top100');
+      const cached = await redis.get<CoinGeckoMarket[]>(cacheKey);
+
+      if (cached) {
+        return NextResponse.json(cached, { headers });
+      }
+
+      const response = await axios.get<CoinGeckoMarket[]>(COINGECKO_ENDPOINTS.markets, {
         params: {
           vs_currency: 'usd',
           order: 'market_cap_desc',
@@ -29,17 +44,36 @@ export async function GET(request: Request) {
           sparkline: false
         }
       });
-      return NextResponse.json(response.data);
+
+      await redis.set(cacheKey, response.data, { ex: CACHE_TTL });
+      return NextResponse.json(response.data, { headers });
     }
 
     // Support batching: allow comma-separated symbols
     const symbols = symbol.split(',').map(s => s.trim()).filter(Boolean);
-    const cacheKey = symbols.join(',');
-    const now = Date.now();
-    if (priceCache[cacheKey] && now - priceCache[cacheKey].timestamp < CACHE_TTL) {
-      return NextResponse.json(priceCache[cacheKey].data);
+    
+    if (symbols.length === 0) {
+      return NextResponse.json<APIError>(
+        { message: 'Invalid symbols provided', status: 400 },
+        { status: 400, headers }
+      );
     }
-    const response = await axios.get(`${COINGECKO_API}/simple/price`, {
+
+    if (symbols.length > 50) {
+      return NextResponse.json<APIError>(
+        { message: 'Too many symbols. Maximum 50 allowed.', status: 400 },
+        { status: 400, headers }
+      );
+    }
+
+    const cacheKey = getCacheKey('prices', symbols.join(','));
+    const cached = await redis.get<PriceData>(cacheKey);
+
+    if (cached) {
+      return NextResponse.json(cached, { headers });
+    }
+
+    const response = await axios.get<PriceData>(COINGECKO_ENDPOINTS.prices, {
       params: {
         ids: symbols.join(','),
         vs_currencies: 'usd',
@@ -47,15 +81,37 @@ export async function GET(request: Request) {
         include_market_cap: true
       }
     });
-    priceCache[cacheKey] = { data: response.data, timestamp: now };
+
+    await redis.set(cacheKey, response.data, { ex: CACHE_TTL });
     return NextResponse.json(response.data);
   } catch (error) {
-    const axiosError = error as AxiosError;
-    if (axiosError.response && axiosError.response.status === 429) {
-      console.error('CoinGecko rate limit exceeded:', error);
-      return NextResponse.json({ error: 'CoinGecko API rate limit exceeded. Please try again later.' }, { status: 429 });
+    console.error('Error in /api/crypto:', error);
+    
+    if (error instanceof RateLimitError) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': Math.ceil((error.resetTime - Date.now()) / 1000).toString() } }
+      );
     }
-    console.error('Error fetching crypto data:', error);
-    return NextResponse.json({ error: 'Failed to fetch crypto data' }, { status: 500 });
+
+    const axiosError = error as AxiosError;
+    if (axiosError.response?.status === 429) {
+      return NextResponse.json(
+        { error: 'CoinGecko API rate limit exceeded. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
+    if (axiosError.response?.status === 404) {
+      return NextResponse.json(
+        { error: 'Cryptocurrency not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

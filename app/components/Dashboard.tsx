@@ -59,6 +59,14 @@ export default function Dashboard() {
     currentPage * itemsPerPage
   );
 
+  useEffect(() => {
+    // Load favorites from localStorage on component mount
+    const storedFavorites = localStorage.getItem('favorites');
+    if (storedFavorites) {
+      setFavorites(JSON.parse(storedFavorites));
+    }
+  }, []);
+
   // Toggle favorite
   const toggleFavorite = (symbol: string, name: string) => {
     setFavorites((prev) => {
@@ -66,6 +74,11 @@ export default function Dashboard() {
       return exists ? prev.filter((fav) => fav.symbol !== symbol) : [...prev, { symbol, name }];
     });
   };
+
+  // Save favorites to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+  }, [favorites]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -189,7 +202,6 @@ export default function Dashboard() {
         <TabList>
           <Tab>Top Cryptocurrencies</Tab>
           <Tab>All Coins</Tab>
-          <Tab>Market Overview</Tab>
           <Tab>Trending</Tab>
         </TabList>
         <TabPanels>
@@ -245,23 +257,6 @@ export default function Dashboard() {
             <PaginationControls />
           </TabPanel>
 
-          {/* Market Overview */}
-          <TabPanel>
-            <div className="mt-6">
-              <Card className="bg-gray-50 dark:bg-[#23263a]">
-                <Title className="text-xl font-bold text-primary-dark dark:text-accent-cyan">Market Cap Distribution</Title>
-                <AreaChart
-                  className="mt-4 h-72"
-                  data={marketChartData}
-                  index="name"
-                  categories={["Market Cap"]}
-                  colors={["blue"]}
-                  valueFormatter={(number) => `$${number.toFixed(2)}B`}
-                />
-              </Card>
-            </div>
-          </TabPanel>
-
           {/* Trending */}
           <TabPanel>
             <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -284,6 +279,21 @@ export default function Dashboard() {
           </TabPanel>
         </TabPanels>
       </TabGroup>
+
+      {/* Market Overview Card - Always Visible */}
+      <div className="mt-6">
+        <Card className="bg-gray-50 dark:bg-[#23263a]">
+          <Title className="text-xl font-bold text-primary-dark dark:text-accent-cyan">Market Cap Distribution</Title>
+          <AreaChart
+            className="mt-4 h-72"
+            data={marketChartData}
+            index="name"
+            categories={["Market Cap"]}
+            colors={["blue"]}
+            valueFormatter={(number) => `$${number.toFixed(2)}B`}
+          />
+        </Card>
+      </div>
     </main>
   );
 }

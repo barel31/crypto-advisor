@@ -41,3 +41,13 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+.vercel
+
+/lib/generated/prisma
+
+/lib/generated/prisma
+
+dev.db
+.vercel
+.env*.local
