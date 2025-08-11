@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+import type { AxiosError } from 'axios';
 // Simple in-memory cache for price data
-const priceCache: Record<string, { data: any; timestamp: number }> = {};
+type PriceData = Record<string, {
+  usd: number;
+  usd_24h_change?: number;
+  usd_market_cap?: number;
+}>;
+const priceCache: Record<string, { data: PriceData; timestamp: number }> = {};
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 // You'll need to sign up for a free API key at CoinGecko or similar service
@@ -43,8 +49,9 @@ export async function GET(request: Request) {
     });
     priceCache[cacheKey] = { data: response.data, timestamp: now };
     return NextResponse.json(response.data);
-  } catch (error: any) {
-    if (error.response && error.response.status === 429) {
+  } catch (error) {
+    const axiosError = error as AxiosError;
+    if (axiosError.response && axiosError.response.status === 429) {
       console.error('CoinGecko rate limit exceeded:', error);
       return NextResponse.json({ error: 'CoinGecko API rate limit exceeded. Please try again later.' }, { status: 429 });
     }

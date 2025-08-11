@@ -23,8 +23,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="min-h-screen bg-gray-50 dark:bg-primary-dark">
-          <nav className="bg-white dark:bg-primary-dark shadow">
+  <div className="min-h-screen">
+          <nav className="shadow">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between h-16">
                 <div className="flex">

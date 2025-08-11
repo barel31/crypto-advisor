@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+import type { AxiosError } from 'axios';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -13,7 +14,12 @@ interface TradingSuggestion {
   stop_loss?: number;
 }
 
-async function analyzeTrend(symbol: string, historicalData: any[]): Promise<TradingSuggestion> {
+interface HistoricalDataPoint {
+  price: number;
+  volume: number;
+}
+
+async function analyzeTrend(symbol: string, historicalData: HistoricalDataPoint[]): Promise<TradingSuggestion> {
   // Simple moving averages
   const prices = historicalData.map(d => d.price);
   const sma20 = calculateSMA(prices, 20);
@@ -118,7 +124,7 @@ export async function GET(request: Request) {
     }
 
     // Fetch historical data from your crypto API
-    let historicalData;
+    let historicalData: HistoricalDataPoint[];
     try {
       const origin = request.headers.get('origin') || 'http://localhost:3000';
       const url = `${origin}/api/crypto/historical?symbol=${symbol}`;
@@ -132,22 +138,18 @@ export async function GET(request: Request) {
         );
       }
     } catch (err) {
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const response = (err as any).response;
-        if (response.status === 404) {
-          // Pass through user-friendly message from historical API
-          return NextResponse.json(
-            { error: 'No historical data available for this symbol.' },
-            { status: 404 }
-          );
-        }
-        if (response.status === 429) {
-          // Pass through user-friendly message for rate limit
-          return NextResponse.json(
-            { error: 'CoinGecko API rate limit exceeded. Please try again in a few minutes.' },
-            { status: 429 }
-          );
-        }
+      const axiosErr = err as AxiosError;
+      if (axiosErr.response && axiosErr.response.status === 404) {
+        return NextResponse.json(
+          { error: 'No historical data available for this symbol.' },
+          { status: 404 }
+        );
+      }
+      if (axiosErr.response && axiosErr.response.status === 429) {
+        return NextResponse.json(
+          { error: 'CoinGecko API rate limit exceeded. Please try again in a few minutes.' },
+          { status: 429 }
+        );
       }
       console.error('Error fetching historical data:', err);
       return NextResponse.json(
@@ -157,7 +159,7 @@ export async function GET(request: Request) {
     }
 
     // Analyze the data and generate trading suggestion
-    let suggestion;
+    let suggestion: TradingSuggestion;
     try {
       suggestion = await analyzeTrend(symbol, historicalData);
     } catch (err) {

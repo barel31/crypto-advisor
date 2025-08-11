@@ -167,8 +167,18 @@ export default function PortfolioPage() {
     setNotification({ message, type });
   };
 
+  // System theme detection
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   return (
-    <main className="p-4 md:p-10 mx-auto max-w-7xl slide-up">
+    <main className={`p-4 md:p-10 mx-auto max-w-7xl slide-up ${isDark ? 'bg-primary-dark text-white' : 'bg-gray-50 text-primary-dark'}`}> 
       {notification && (
         <Notification
           message={notification.message}
@@ -254,7 +264,7 @@ export default function PortfolioPage() {
                 <Title>Risk Level</Title>
                 <div className="mt-4">
                   <Badge color="yellow">Moderate</Badge>
-                  <p className="mt-2 text-sm text-gray-600">Based on portfolio diversity and market volatility</p>
+                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">Based on portfolio diversity and market volatility</p>
                 </div>
               </Card>
             </div>
@@ -262,7 +272,7 @@ export default function PortfolioPage() {
             <div className="mt-6">
               <Card>
                 <Title>Portfolio Distribution</Title>
-                <BarChart
+                <BarChart 
                   className="mt-4 h-72"
                   data={chartData}
                   index="name"
@@ -289,17 +299,23 @@ export default function PortfolioPage() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider bg-gray-800/50">Suggestion</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-primary-dark divide-y divide-gray-200">
                       {portfolio.map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.symbol}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{item.amount}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">${item.buyPrice.toLocaleString()}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">${(item.currentPrice || 0).toLocaleString()}</td>
-                          <td className={`px-6 py-4 whitespace-nowrap ${(item.profitLoss || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {(item.profitLoss || 0) >= 0 ? '+' : ''}{(item.profitLoss || 0).toLocaleString()} USD
-                            <span className="ml-1 text-sm">
-                              ({(item.profitLossPercentage || 0).toFixed(2)}%)
+                        <tr key={item.id} className="dark:bg-primary-dark">
+                          <td className="px-6 py-4 whitespace-nowrap text-primary-dark dark:text-white">{item.symbol}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-primary-dark dark:text-white">{item.amount}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-primary-dark dark:text-white">${item.buyPrice.toLocaleString()}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-primary-dark dark:text-white">${(item.currentPrice || 0).toLocaleString()}</td>
+                          <td className={`px-6 py-4 whitespace-nowrap ${(item.profitLoss || 0) >= 0 ? 'text-green-500' : 'text-red-500'} dark:text-green-400 dark:text-red-400`}>
+                            <span className={
+                              (item.profitLoss || 0) >= 0
+                                ? 'text-green-500 dark:text-green-400'
+                                : 'text-red-500 dark:text-red-400'
+                            }>
+                              {(item.profitLoss || 0) >= 0 ? '+' : ''}{(item.profitLoss || 0).toLocaleString()} USD
+                              <span className="ml-1 text-sm">
+                                ({(item.profitLossPercentage || 0).toFixed(2)}%)
+                              </span>
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
