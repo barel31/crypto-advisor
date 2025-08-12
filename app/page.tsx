@@ -4,6 +4,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { Suspense } from 'react';
 import Dashboard from './components/Dashboard';
 import { HOME_CONTENT } from './constants/homeContent';
+import DashboardLoading from './components/ui/DashboardLoading';
 
 function ErrorFallback() {
   return (
@@ -33,7 +34,7 @@ export default function Home() {
             </p>
           </div>
           <ErrorBoundary FallbackComponent={ErrorFallback}>
-            <Suspense fallback={<div className="text-center">Loading dashboard...</div>}>
+            <Suspense fallback={<DashboardLoading />}>
               <Dashboard />
             </Suspense>
           </ErrorBoundary>

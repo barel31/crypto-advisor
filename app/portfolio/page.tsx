@@ -8,6 +8,7 @@ import Notification from '../components/Notification';
 import PortfolioOverview from '../components/portfolio/PortfolioOverview';
 import PortfolioHoldings from '../components/portfolio/PortfolioHoldings';
 import PortfolioAnalysis from '../components/portfolio/PortfolioAnalysis';
+import PortfolioLoading from '../components/ui/PortfolioLoading';
 import type { PortfolioItem, TradingSuggestion } from '../types/portfolio';
 
 export default function PortfolioPage() {
@@ -70,7 +71,8 @@ export default function PortfolioPage() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
   const [tradingSuggestions, setTradingSuggestions] = useState<Record<string, TradingSuggestion>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);;
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -130,7 +132,10 @@ export default function PortfolioPage() {
         setError('Unable to fetch trading suggestions. Please try again later.');
         showNotification('Error loading trading suggestions', 'error');
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          setInitialLoading(false);
+        }
       }
     };
 
@@ -159,6 +164,11 @@ export default function PortfolioPage() {
   const totalProfitLoss = portfolio.reduce((acc: number, item: PortfolioItem) => {
     return acc + (item.profitLoss || 0);
   }, 0);
+
+  // Show full loading page on initial load
+  if (initialLoading) {
+    return <PortfolioLoading />;
+  }
 
   return (
     <main className={`p-4 md:p-10 mx-auto max-w-7xl slide-up ${isDark ? 'bg-primary-dark text-white' : 'bg-gray-50 text-primary-dark'}`}> 

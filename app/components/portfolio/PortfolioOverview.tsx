@@ -20,10 +20,26 @@ export default function PortfolioOverview({
   isLoading,
   error
 }: PortfolioOverviewProps) {
-  const chartData = portfolio.map((item) => ({
-    name: item.symbol,
-    'Current Value': (item.currentPrice || 0) * item.amount,
-  }));
+  const chartData = portfolio.map((item) => {
+    const currentValue = (item.currentPrice || 0) * item.amount;
+    const percentage = (currentValue / totalValue) * 100;
+    const suggestion = tradingSuggestions[item.symbol];
+    return {
+      name: item.symbol,
+      'Current Value': currentValue,
+      'Allocation %': percentage,
+      action: suggestion?.action || 'HOLD',
+      dayChange: suggestion?.dayChange || 0,
+    };
+  }).sort((a, b) => b['Current Value'] - a['Current Value']);
+
+  const getActionColor = (action: string): Color => {
+    switch (action) {
+      case 'BUY': return 'green';
+      case 'SELL': return 'red';
+      default: return 'yellow';
+    }
+  };
 
   return (
     <>
@@ -81,21 +97,56 @@ export default function PortfolioOverview({
       </div>
 
       <div className="mt-6">
-        <Card className="mt-6">
-          <Title>Portfolio Distribution</Title>
+        <Card className="mt-6 dark:bg-[#23263a]">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <Title className="text-xl font-bold dark:text-accent-cyan">Portfolio Distribution</Title>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                Asset allocation and performance
+              </p>
+            </div>
+          </div>
           <BarChart 
-            className="mt-4 h-72"
+            className="mt-4 h-80"
             data={chartData}
             index="name"
-            categories={['Current Value']}
-            colors={['blue']}
-            valueFormatter={(value: number) => `$${value.toLocaleString()}`}
-            showLegend={false}
-            showGridLines={true}
-            startEndOnly={true}
-            showXAxis={true}
-            showYAxis={true}
+            categories={['Current Value', 'Allocation %']}
+            colors={['cyan', 'blue']}
+            valueFormatter={(value: number) => 
+              typeof value === 'number' && value < 100 
+                ? `${value.toFixed(1)}%` 
+                : `$${value.toLocaleString()}`
+            }
+            showLegend={true}
+            showGridLines={false}
+            showAnimation={true}
           />
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            {chartData.map((item) => (
+              <div key={item.name} 
+                className={`p-3 rounded-lg ${
+                  item.dayChange >= 0 
+                    ? 'bg-green-100 dark:bg-green-900' 
+                    : 'bg-red-100 dark:bg-red-900'
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="font-medium dark:text-white">{item.name}</span>
+                  <Badge 
+                    color={getActionColor(item.action)}
+                    className="uppercase"
+                  >
+                    {item.action}
+                  </Badge>
+                </div>
+                <div className="mt-1 text-sm">
+                  <span className={item.dayChange >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>
+                    {item.dayChange >= 0 ? '+' : ''}{item.dayChange.toFixed(2)}% 24h
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
     </>

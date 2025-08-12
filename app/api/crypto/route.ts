@@ -7,12 +7,12 @@ import {
   getHeaders,
   RateLimitError,
   redis
-} from '@/lib/api-utils';
+} from '@/app/lib/api-utils';
 import type { 
   CoinGeckoMarket,
   PriceData,
   APIError 
-} from '@/types/api';
+} from '@/app/types/api';
 
 const CACHE_TTL = 10 * 60; // 10 minutes in seconds
 

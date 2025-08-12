@@ -4,6 +4,7 @@ import { Card, Title, LineChart, Subtitle, Select, SelectItem } from '@tremor/re
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Decimal from 'decimal.js';
+import { ChartSkeleton } from '@/app/components/ui/Skeleton';
 
 interface HistoricalDataPoint {
   timestamp: number;
@@ -203,9 +204,7 @@ export default function AnalysisPage() {
         <Card>
           <Title>Price Chart</Title>
           {isLoading ? (
-            <div className="h-72 flex items-center justify-center">
-              <div className="animate-pulse text-gray-500">Loading data...</div>
-            </div>
+            <ChartSkeleton />
           ) : chartData.length > 0 ? (
             <LineChart
               className="mt-4 h-72"
@@ -226,114 +225,143 @@ export default function AnalysisPage() {
       <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card>
           <Title>Technical Analysis</Title>
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-lg font-medium">Trend</span>
-              <span className={`px-3 py-1 rounded-full text-sm ${
-                analysis.trend === 'BULLISH' ? 'bg-green-100 text-green-800' :
-                analysis.trend === 'BEARISH' ? 'bg-red-100 text-red-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {analysis.trend}
-              </span>
+          {isLoading ? (
+            <div className="mt-4 space-y-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="h-4 w-24 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="h-6 w-32 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+                </div>
+              ))}
             </div>
-            <div>
-              <span className="text-lg font-medium">Signal Strength</span>
-              <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
-                <div
-                  className={`h-2.5 rounded-full ${
-                    analysis.trend === 'BULLISH' ? 'bg-green-600' :
-                    analysis.trend === 'BEARISH' ? 'bg-red-600' :
-                    'bg-blue-600'
-                  }`}
-                  style={{ width: `${analysis.confidence * 100}%` }}
-                ></div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-medium">Trend</span>
+                <span className={`px-3 py-1 rounded-full text-sm ${
+                  analysis.trend === 'BULLISH' ? 'bg-green-100 text-green-800' :
+                  analysis.trend === 'BEARISH' ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {analysis.trend}
+                </span>
               </div>
-            </div>
-            <div>
-              <span className="text-lg font-medium">RSI</span>
-              <div className="mt-2 flex items-center space-x-2">
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div>
+                <span className="text-lg font-medium">Signal Strength</span>
+                <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
                   <div
                     className={`h-2.5 rounded-full ${
-                      analysis.rsi > 70 ? 'bg-red-600' :
-                      analysis.rsi < 30 ? 'bg-green-600' :
-                      'bg-yellow-600'
+                      analysis.trend === 'BULLISH' ? 'bg-green-600' :
+                      analysis.trend === 'BEARISH' ? 'bg-red-600' :
+                      'bg-blue-600'
                     }`}
-                    style={{ width: `${analysis.rsi}%` }}
+                    style={{ width: `${analysis.confidence * 100}%` }}
                   ></div>
                 </div>
-                <span className="text-sm font-medium">{analysis.rsi.toFixed(1)}</span>
+              </div>
+              <div>
+                <span className="text-lg font-medium">RSI</span>
+                <div className="mt-2 flex items-center space-x-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div
+                      className={`h-2.5 rounded-full ${
+                        analysis.rsi > 70 ? 'bg-red-600' :
+                        analysis.rsi < 30 ? 'bg-green-600' :
+                        'bg-yellow-600'
+                      }`}
+                      style={{ width: `${analysis.rsi}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-sm font-medium">{analysis.rsi.toFixed(1)}</span>
+                </div>
+              </div>
+              <div>
+                <span className="text-lg font-medium">Analysis</span>
+                <p className="mt-2 text-gray-600">{analysis.reasoning}</p>
               </div>
             </div>
-            <div>
-              <span className="text-lg font-medium">Analysis</span>
-              <p className="mt-2 text-gray-600">{analysis.reasoning}</p>
-            </div>
-          </div>
+          )}
         </Card>
 
         <Card>
           <Title>Technical Indicators</Title>
-          <div className="mt-4 space-y-4">
-            <div>
-              <span className="text-lg font-medium">Moving Averages</span>
-              <div className="mt-2 space-y-2">
-                <div className="flex justify-between">
-                  <span>SMA (20)</span>
-                  <span className="font-medium">${analysis.movingAverages.sma20.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+          {isLoading ? (
+            <div className="mt-4 space-y-4">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="h-4 w-32 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+                  <div className="space-y-1">
+                    <div className="h-3 w-full bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="h-3 w-3/4 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>EMA (50)</span>
-                  <span className="font-medium">${analysis.movingAverages.ema50.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <div>
+                <span className="text-lg font-medium">Moving Averages</span>
+                <div className="mt-2 space-y-2">
+                  <div className="flex justify-between">
+                    <span>SMA (20)</span>
+                    <span className="font-medium">${analysis.movingAverages.sma20.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>EMA (50)</span>
+                    <span className="font-medium">${analysis.movingAverages.ema50.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <span className="text-lg font-medium">MACD</span>
+                <div className="mt-2 space-y-2">
+                  <div className="flex justify-between">
+                    <span>Signal Line</span>
+                    <span className={`font-medium ${analysis.macd.signal > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {analysis.macd.signal.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Histogram</span>
+                    <span className={`font-medium ${analysis.macd.histogram > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {analysis.macd.histogram.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <span className="text-lg font-medium">Key Levels</span>
+                <div className="mt-2 space-y-2">
+                  <div className="flex justify-between">
+                    <span>Resistance</span>
+                    <span className="font-medium text-red-600">${analysis.resistance.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Support</span>
+                    <span className="font-medium text-green-600">${analysis.support.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <div>
-              <span className="text-lg font-medium">MACD</span>
-              <div className="mt-2 space-y-2">
-                <div className="flex justify-between">
-                  <span>Signal Line</span>
-                  <span className={`font-medium ${analysis.macd.signal > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {analysis.macd.signal.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Histogram</span>
-                  <span className={`font-medium ${analysis.macd.histogram > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {analysis.macd.histogram.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <span className="text-lg font-medium">Key Levels</span>
-              <div className="mt-2 space-y-2">
-                <div className="flex justify-between">
-                  <span>Resistance</span>
-                  <span className="font-medium text-red-600">${analysis.resistance.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Support</span>
-                  <span className="font-medium text-green-600">${analysis.support.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </Card>
       </div>
       
       <div className="mt-6">
         <Card>
           <Title>Volume Analysis</Title>
-          <LineChart
-            className="mt-4 h-48"
-            data={chartData}
-            index="date"
-            categories={["Volume"]}
-            colors={["purple"]}
-            yAxisWidth={100}
-          />
+          {isLoading ? (
+            <ChartSkeleton />
+          ) : (
+            <LineChart
+              className="mt-4 h-48"
+              data={chartData}
+              index="date"
+              categories={["Volume"]} 
+              colors={["purple"]}
+              yAxisWidth={100}
+            />
+          )}
         </Card>
       </div>
     </main>
