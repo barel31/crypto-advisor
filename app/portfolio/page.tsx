@@ -4,6 +4,7 @@ import { Title, Subtitle, Button, TabGroup, TabList, Tab, TabPanels, TabPanel } 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { cache } from '../lib/cache';
 import Notification from '../components/Notification';
 import PortfolioOverview from '../components/portfolio/PortfolioOverview';
 import PortfolioHoldings from '../components/portfolio/PortfolioHoldings';
@@ -77,55 +78,65 @@ export default function PortfolioPage() {
   useEffect(() => {
     let isMounted = true;
     const fetchTradingSuggestions = async () => {
+      if (!portfolio.length) return;
+      
       setIsLoading(true);
       setError(null);
+      
       try {
-        // Throttle requests: 1500ms delay between each
         const suggestionsMap: Record<string, TradingSuggestion> = {};
-        for (let i = 0; i < portfolio.length; i++) {
-          const item = portfolio[i];
+        const fetchPromises = portfolio.map(async (item) => {
+          // Check cache first
+          const cachedSuggestion = cache.get<TradingSuggestion>(item.symbol);
+          if (cachedSuggestion) {
+            suggestionsMap[item.symbol] = cachedSuggestion;
+            return;
+          }
+
           try {
-            await new Promise(res => setTimeout(res, 1500));
             const response = await axios.get(`/api/trading-suggestions?symbol=${item.symbol}`);
             if (response.status === 429 || response.data?.error?.includes('rate limit')) {
-              setError('Crypto data is temporarily unavailable due to rate limits. Please try again later.');
-              showNotification('Crypto data is temporarily unavailable due to rate limits. Please try again later.', 'warning');
-              suggestionsMap[item.symbol] = {
-                symbol: item.symbol,
-                action: 'HOLD',
-                confidence: 0,
-                reason: 'Rate limit exceeded. Try again later.',
-                dayChange: 0
-              };
-            } else {
-              suggestionsMap[item.symbol] = {
-                symbol: item.symbol,
-                ...response.data
-              };
+              throw new Error('Rate limit exceeded');
+            }
+            const suggestion = {
+              symbol: item.symbol,
+              ...response.data
+            };
+            suggestionsMap[item.symbol] = suggestion;
+            cache.set(item.symbol, suggestion);
+          } catch (error) {
+            console.error(`Error fetching data for ${item.symbol}:`, error);
+            suggestionsMap[item.symbol] = {
+              symbol: item.symbol,
+              action: 'HOLD',
+              confidence: 0,
+              reason: error instanceof Error && error.message === 'Rate limit exceeded' 
+                ? 'Rate limit exceeded. Try again later.'
+                : 'Unable to fetch data',
+              dayChange: 0
+            };
+            if (error instanceof Error && error.message === 'Rate limit exceeded') {
+              throw error; // Propagate rate limit error
+            }
+          }
+        });
+
+        // Execute all promises with a delay between each
+        for (let i = 0; i < fetchPromises.length; i++) {
+          try {
+            await fetchPromises[i];
+            if (i < fetchPromises.length - 1) {
+              await new Promise(res => setTimeout(res, 1000)); // 1 second delay between requests
             }
           } catch (error) {
-            if (isAxiosError(error) && error.response?.status === 429) {
+            if (error instanceof Error && error.message === 'Rate limit exceeded') {
               setError('Crypto data is temporarily unavailable due to rate limits. Please try again later.');
               showNotification('Crypto data is temporarily unavailable due to rate limits. Please try again later.', 'warning');
-              suggestionsMap[item.symbol] = {
-                symbol: item.symbol,
-                action: 'HOLD',
-                confidence: 0,
-                reason: 'Rate limit exceeded. Try again later.',
-                dayChange: 0
-              };
-            } else {
-              console.error(`Error fetching data for ${item.symbol}:`, error);
-              suggestionsMap[item.symbol] = {
-                symbol: item.symbol,
-                action: 'HOLD',
-                confidence: 0,
-                reason: 'Unable to fetch data',
-                dayChange: 0
-              };
+              break;
             }
           }
         }
+
         if (isMounted) setTradingSuggestions(suggestionsMap);
       } catch (error) {
         console.error('Error fetching trading suggestions:', error);
@@ -140,7 +151,14 @@ export default function PortfolioPage() {
     };
 
     fetchTradingSuggestions();
-    return () => { isMounted = false; };
+    
+    // Set up an interval to refresh data every 5 minutes
+    const interval = setInterval(fetchTradingSuggestions, 5 * 60 * 1000);
+    
+    return () => { 
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [portfolio]);
 
   const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {

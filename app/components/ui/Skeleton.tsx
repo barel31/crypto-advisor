@@ -74,7 +74,7 @@ export function ChartSkeleton() {
             className="bg-gray-300 dark:bg-gray-600 rounded-t"
             style={{
               width: '30px',
-              height: `${Math.random() * 200 + 50}px`,
+              height: `${100 + (index % 3) * 50}px`,
               animationDelay: `${index * 0.1}s`
             }}
           />

@@ -68,3 +68,16 @@ model PriceAlert {
   @@index([symbol])
   @@index([userId])
 }
+
+model MarketAnalysis {
+  id         String   @id @default(cuid())
+  symbol     String
+  trend      String
+  confidence Float
+  analysis   String
+  validUntil DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([symbol])
+}
