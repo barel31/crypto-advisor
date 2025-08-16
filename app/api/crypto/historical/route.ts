@@ -52,49 +52,51 @@ export async function GET(request: Request) {
 
     let response;
     try {
-      // Determine interval based on days
-      const interval = Number(days) <= 1 ? 'minute' : 
-                      Number(days) <= 7 ? 'hourly' : 'daily';
+      // For free API, we don't need to specify the interval
+      const params: any = {
+        vs_currency: 'usd',
+        days,
+      };
 
-      // Try authenticated API first if key is available
-      if (COINGECKO_API_KEY) {
-        try {
-          response = await axios.get(
-            `${COINGECKO_API}/coins/${coinId}/market_chart`,
-            {
-              params: {
-                vs_currency: 'usd',
-                days,
-                interval,
-              },
-              headers: {
-                'x-cg-pro-api-key': COINGECKO_API_KEY
-              },
-              timeout: 10000, // 10 second timeout
-            }
-          );
-        } catch (err) {
-          console.warn('Failed to fetch from pro API, falling back to demo:', err);
-          // Let it fall through to demo API
-        }
-      }
-
-      // If no API key or pro API failed, try demo API with reduced rate
-      if (!response) {
+      // Always try the free API first since it has better availability
+      try {
         // Add delay to respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1200)); // Ensure we stay under the rate limit
         
         response = await axios.get(
           `${COINGECKO_DEMO_API}/coins/${coinId}/market_chart`,
           {
-            params: {
-              vs_currency: 'usd',
-              days,
-              interval,
-            },
-            timeout: 10000, // 10 second timeout
+            params,
+            timeout: 15000, // 15 second timeout
           }
         );
+      } catch (err) {
+        console.warn('Failed to fetch from free API:', err);
+        
+        // Only try pro API if we have a key and the free API failed
+        if (COINGECKO_API_KEY) {
+          console.log('Attempting to use pro API...');
+          // For pro API, we can include the interval
+          if (Number(days) <= 1) {
+            params.interval = 'minute';
+          } else if (Number(days) <= 7) {
+            params.interval = 'hourly';
+          }
+          
+          response = await axios.get(
+            `${COINGECKO_API}/coins/${coinId}/market_chart`,
+            {
+              params,
+              headers: {
+                'x-cg-pro-api-key': COINGECKO_API_KEY
+              },
+              timeout: 15000, // 15 second timeout
+            }
+          );
+        } else {
+          // If we don't have a pro API key, throw the original error
+          throw err;
+        }
       }
 
       if (!response.data || typeof response.data !== 'object') {

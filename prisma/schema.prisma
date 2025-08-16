@@ -70,14 +70,20 @@ model PriceAlert {
 }
 
 model MarketAnalysis {
-  id         String   @id @default(cuid())
-  symbol     String
-  trend      String
-  confidence Float
-  analysis   String
-  validUntil DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  symbol              String
+  trend               String
+  confidence          Float
+  analysis            String
+  risk_level          String    @default("MEDIUM") // LOW, MEDIUM, HIGH
+  risk_score          Float     @default(0)
+  market_strength     Float     @default(0)
+  target_price        Float?
+  stop_loss           Float?
+  technical_indicators String?   // JSON string
+  validUntil          DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([symbol])
 }
