@@ -2,19 +2,26 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import type { AxiosError } from 'axios';
 import { prisma } from '@/lib/prisma';
+
+// Types
 import {
   HistoricalDataPoint,
   TradingSuggestion,
-  TechnicalIndicators,
   RiskAssessment,
   MarketCondition
 } from '@/app/types/analysis';
+import { TechnicalIndicators } from '@/app/types/technical';
+
+// Analysis utilities
 import {
   analyzeTechnicalIndicators,
   calculateConfidenceScore
 } from '@/app/lib/technical-analysis';
-
-import { detectCandlePatterns, calculateFibonacciLevels, detectDivergence } from '@/app/lib/pattern-recognition';
+import { 
+  detectCandlePatterns, 
+  calculateFibonacciLevels, 
+  detectDivergence 
+} from '@/app/lib/pattern-recognition';
 import { analyzeMarketSentiment } from '@/app/lib/market-sentiment';
 
 async function analyzeTrend(symbol: string, historicalData: HistoricalDataPoint[]): Promise<TradingSuggestion> {
@@ -24,8 +31,15 @@ async function analyzeTrend(symbol: string, historicalData: HistoricalDataPoint[
   const prices = historicalData.map(d => d.price);
   const volumes = historicalData.map(d => d.volume);
   
+  // Transform data for pattern detection
+  const patternData = historicalData.map(d => ({
+    price: d.price,
+    volume: d.volume,
+    timestamp: typeof d.timestamp === 'string' ? new Date(d.timestamp).getTime() : d.timestamp
+  }));
+  
   // Detect patterns
-  const candlePatterns = detectCandlePatterns(historicalData);
+  const candlePatterns = detectCandlePatterns(patternData);
   
   // Analyze market sentiment
   const sentiment = analyzeMarketSentiment(
@@ -182,7 +196,6 @@ async function analyzeTrend(symbol: string, historicalData: HistoricalDataPoint[
     indicators,
     validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   };
-}
 }
 
 function calculateSMA(prices: number[], period: number): number {

@@ -8,6 +8,9 @@ interface CandlePattern {
   pattern: string;
   strength: number;
   probability: number;
+  significance: 'major' | 'minor';
+  type: 'reversal' | 'continuation';
+  timeframe: 'short' | 'medium' | 'long';
 }
 
 interface FibonacciLevels {
@@ -25,47 +28,152 @@ interface FibonacciLevels {
     level_2618: number; // 261.8%
     level_4236: number; // 423.6%
   };
+  pivots: {
+    r3: number;      // Resistance 3
+    r2: number;      // Resistance 2
+    r1: number;      // Resistance 1
+    pivot: number;   // Pivot Point
+    s1: number;      // Support 1
+    s2: number;      // Support 2
+    s3: number;      // Support 3
+  };
+}
+
+interface DoublePattern {
+  pattern: string;
+  strength: number;
+  probability: number;
+  significance: 'major' | 'minor';
+  type: 'reversal' | 'continuation';
+  timeframe: 'short' | 'medium' | 'long';
+  confirmationLevel: number;
+  invalidationLevel: number;
+}
+
+interface PriceAction {
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+function getPriceAction(data: PatternPoint[], index: number): PriceAction {
+  const slice = data.slice(index - 1, index + 1);
+  return {
+    open: slice[0].price,
+    high: Math.max(...slice.map(p => p.price)),
+    low: Math.min(...slice.map(p => p.price)),
+    close: slice[slice.length - 1].price,
+    volume: slice[slice.length - 1].volume
+  };
 }
 
 export function detectCandlePatterns(data: PatternPoint[]): CandlePattern[] {
   const patterns: CandlePattern[] = [];
   const prices = data.map(d => d.price);
   
-  // Doji pattern
-  if (isDoji(prices.slice(-1)[0], prices.slice(-2)[0])) {
-    patterns.push({
-      pattern: 'Doji',
-      strength: 0.6,
-      probability: calculatePatternProbability(data, 'Doji')
-    });
+  // Analyze last 20 candles for patterns
+  for (let i = 20; i < data.length; i++) {
+    const currentCandle = getPriceAction(data, i);
+    const prevCandle = getPriceAction(data, i - 1);
+    const prev2Candle = getPriceAction(data, i - 2);
+    
+    // Doji Pattern
+    if (isDoji(currentCandle)) {
+      patterns.push({
+        pattern: 'Doji',
+        strength: 0.6,
+        probability: calculatePatternProbability(data, 'Doji', i),
+        significance: 'minor',
+        type: 'reversal',
+        timeframe: 'short'
+      });
+    }
+    
+    // Hammer Pattern
+    if (isHammer(currentCandle)) {
+      patterns.push({
+        pattern: 'Hammer',
+        strength: 0.7,
+        probability: calculatePatternProbability(data, 'Hammer', i),
+        significance: 'major',
+        type: 'reversal',
+        timeframe: 'medium'
+      });
+    }
+    
+    // Shooting Star
+    if (isShootingStar(currentCandle)) {
+      patterns.push({
+        pattern: 'Shooting Star',
+        strength: 0.65,
+        probability: calculatePatternProbability(data, 'Shooting Star', i),
+        significance: 'major',
+        type: 'reversal',
+        timeframe: 'short'
+      });
+    }
+    
+    // Engulfing Pattern
+    if (isEngulfing(currentCandle, prevCandle)) {
+      const patternType = currentCandle.close > currentCandle.open ? 'Bullish' : 'Bearish';
+      patterns.push({
+        pattern: `${patternType} Engulfing`,
+        strength: 0.8,
+        probability: calculatePatternProbability(data, `${patternType} Engulfing`, i),
+        significance: 'major',
+        type: 'reversal',
+        timeframe: 'medium'
+      });
+    }
+    
+    // Morning/Evening Star
+    if (isMorningEveningStar(currentCandle, prevCandle, prev2Candle)) {
+      const patternType = currentCandle.close > prev2Candle.open ? 'Morning' : 'Evening';
+      patterns.push({
+        pattern: `${patternType} Star`,
+        strength: 0.85,
+        probability: calculatePatternProbability(data, `${patternType} Star`, i),
+        significance: 'major',
+        type: 'reversal',
+        timeframe: 'long'
+      });
+    }
+    
+    // Three White Soldiers / Black Crows
+    if (isThreeSoldiersCrows(data.slice(i - 2, i + 1))) {
+      const patternType = currentCandle.close > currentCandle.open ? 'White Soldiers' : 'Black Crows';
+      patterns.push({
+        pattern: `Three ${patternType}`,
+        strength: 0.9,
+        probability: calculatePatternProbability(data, `Three ${patternType}`, i),
+        significance: 'major',
+        type: 'continuation',
+        timeframe: 'long'
+      });
+    }
+    
+    // Double Top/Bottom (requires looking back further)
+    if (i > 30) {
+      const doublePattern = findDoublePattern(data.slice(i - 30, i + 1));
+      if (doublePattern) {
+        patterns.push({
+          ...doublePattern,
+          significance: 'major',
+          type: 'reversal',
+          timeframe: 'long'
+        });
+      }
+    }
   }
   
-  // Hammer pattern
-  if (isHammer(prices.slice(-4))) {
-    patterns.push({
-      pattern: 'Hammer',
-      strength: 0.7,
-      probability: calculatePatternProbability(data, 'Hammer')
-    });
-  }
-  
-  // Engulfing pattern
-  if (isEngulfing(prices.slice(-2))) {
-    const patternType = prices.slice(-1)[0] > prices.slice(-2)[0] ? 'Bullish' : 'Bearish';
-    patterns.push({
-      pattern: `${patternType} Engulfing`,
-      strength: 0.8,
-      probability: calculatePatternProbability(data, `${patternType} Engulfing`)
-    });
-  }
-
   return patterns;
 }
 
 export function calculateFibonacciLevels(high: number, low: number): FibonacciLevels {
   const diff = high - low;
-  
-  return {
+  const levels = {
     retracement: {
       level_0: high,
       level_236: high - (diff * 0.236),
@@ -79,6 +187,21 @@ export function calculateFibonacciLevels(high: number, low: number): FibonacciLe
       level_1618: high + (diff * 1.618),
       level_2618: high + (diff * 2.618),
       level_4236: high + (diff * 4.236)
+    }
+  };
+
+  // Add pivot points
+  const pivot = (high + low + levels.retracement.level_500) / 3;
+  return {
+    ...levels,
+    pivots: {
+      r3: pivot + (high - low) * 2,
+      r2: pivot + (high - low),
+      r1: pivot * 2 - low,
+      pivot,
+      s1: pivot * 2 - high,
+      s2: pivot - (high - low),
+      s3: pivot - (high - low) * 2
     }
   };
 }
@@ -105,39 +228,18 @@ export function detectDivergence(
   return { type: null, strength: 0 };
 }
 
-function isDoji(current: number, previous: number): boolean {
-  const bodySize = Math.abs(current - previous);
-  const averagePrice = (current + previous) / 2;
-  return bodySize / averagePrice < 0.001; // 0.1% threshold
-}
+import {
+  isDoji,
+  isHammer,
+  isShootingStar,
+  isEngulfing,
+  isMorningEveningStar,
+  isThreeSoldiersCrows,
+  findDoublePattern,
+  calculatePatternProbability
+} from './pattern-analysis';
 
-function isHammer(prices: number[]): boolean {
-  const [open, high, low, close] = prices;
-  const bodySize = Math.abs(close - open);
-  const shadowSize = Math.abs(Math.min(open, close) - low);
-  return shadowSize > bodySize * 2 && Math.abs(high - Math.max(open, close)) < bodySize * 0.5;
-}
-
-function isEngulfing(prices: number[]): boolean {
-  const [previous, current] = prices;
-  return Math.abs(current - previous) > Math.abs(previous - prices[2]) * 1.5;
-}
-
-function calculatePatternProbability(data: PatternPoint[], pattern: string): number {
-  // Simplified probability calculation based on volume and recent price action
-  const recentVolume = data.slice(-5).reduce((sum, point) => sum + point.volume, 0) / 5;
-  const volumeStrength = data.slice(-1)[0].volume / recentVolume;
-  
-  // Base probability based on pattern type
-  const baseProb = {
-    'Doji': 0.55,
-    'Hammer': 0.65,
-    'Bullish Engulfing': 0.7,
-    'Bearish Engulfing': 0.7
-  }[pattern] || 0.5;
-  
-  return Math.min(baseProb * (1 + (volumeStrength - 1) * 0.3), 0.95);
-}
+// Now imported from pattern-analysis.ts
 
 function calculateTrendDirection(values: number[]): 'up' | 'down' | 'sideways' {
   const changes = values.map((val, i) => i > 0 ? val - values[i-1] : 0).slice(1);
